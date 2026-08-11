@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- BEWUST leeg: geen netwerk-permissie, ook niet in profile-builds. -->
+</manifest>

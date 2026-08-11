@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- BEWUST leeg: geen netwerk-permissie, ook niet in debug-builds.
+         Dit meetinstrument stuurt nooit data naar buiten. Gevolg: hot reload
+         over het netwerk werkt niet; installeer en test de gebouwde APK. -->
+</manifest>
