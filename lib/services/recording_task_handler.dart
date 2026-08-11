@@ -59,9 +59,10 @@ class RecordingTaskHandler extends TaskHandler {
   }
 
   void _startLocationStream() {
-    const settings = LocationSettings(
+    final settings = AndroidSettings(
       accuracy: LocationAccuracy.best,
       distanceFilter: 0,
+      intervalDuration: const Duration(seconds: 1),
     );
     _sub = Geolocator.getPositionStream(locationSettings: settings).listen(
       (pos) {

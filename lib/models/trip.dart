@@ -2,10 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// App version, mirrored from pubspec.yaml (version: 0.1.0+1).
+/// App version, mirrored from pubspec.yaml (version: 0.2.0+2).
 /// The publication pipeline reads pubspec; this constant only lands in the
 /// exported JSON's `appVersion` field.
-const String kAppVersion = '0.1.0+1';
+const String kAppVersion = '0.2.0+2';
 
 /// Formats a [DateTime] as UTC ISO-8601 with a trailing `Z` and *no*
 /// milliseconds, e.g. `2026-08-13T09:14:05Z`. Matches the legacy Ring-Ring
