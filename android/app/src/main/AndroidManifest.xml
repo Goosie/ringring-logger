@@ -15,6 +15,12 @@
     <!-- Batterijoptimalisatie uitschakelen (systeemdialoog). -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
+    <!-- OS-activiteitsherkenning (WALKING/ON_BICYCLE/IN_VEHICLE/STILL), on-device via
+         Play Services — geen netwerkverkeer. Optioneel: bij weigering blijft de app
+         volledig werken en osActivity leeg. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION"/>
+
     <!-- BEWUST GEEN netwerk-permissie: de app stuurt geen enkele byte naar buiten. -->
 
     <application

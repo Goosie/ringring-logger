@@ -96,6 +96,10 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
       _snack('Notificaties geweigerd — de meet-notificatie is dan niet zichtbaar.');
     }
 
+    // Step 4 (optioneel): OS-activiteitsherkenning. Weigeren is prima; de app
+    // werkt onveranderd door, alleen het osActivity-veld blijft dan leeg.
+    await Permissions.requestActivityRecognition();
+
     await _refreshPerms();
   }
 
@@ -261,6 +265,8 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
               _permRow('Notificaties', perms.notifications),
               _permRow('Batterijoptimalisatie uit',
                   perms.ignoreBatteryOptimizations),
+              _permRow('Activiteitsherkenning (optioneel)',
+                  perms.activityRecognition),
               const SizedBox(height: 12),
               Row(
                 children: [

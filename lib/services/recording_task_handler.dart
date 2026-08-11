@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:battery_plus/battery_plus.dart';
+import 'package:flutter_activity_recognition/flutter_activity_recognition.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -28,9 +29,11 @@ void startRecordingCallback() {
 class RecordingTaskHandler extends TaskHandler {
   Trip? _trip;
   StreamSubscription<Position>? _sub;
+  StreamSubscription<Activity>? _activitySub;
   final Battery _battery = Battery();
   int _tick = 0;
   String _currentModality = 'walk';
+  String? _lastOsActivityType;
 
   DateTime _now() => DateTime.now().toUtc();
 
@@ -55,6 +58,7 @@ class RecordingTaskHandler extends TaskHandler {
     await _sampleBattery(); // battery at start
     await _persist();
     _startLocationStream();
+    await _startActivityRecognition();
     _sendStats();
   }
 
@@ -84,6 +88,45 @@ class RecordingTaskHandler extends TaskHandler {
       },
     );
   }
+
+  /// Optional: subscribe to OS activity recognition (WALKING/ON_BICYCLE/...).
+  /// Only *checks* the permission here (never requests it — that needs an
+  /// Activity and already happened in the UI's permission flow). Any failure
+  /// (permission denied, plugin unavailable) leaves osActivity empty and the
+  /// rest of the recording unaffected.
+  Future<void> _startActivityRecognition() async {
+    try {
+      final permission = await FlutterActivityRecognition.instance.checkPermission();
+      if (permission != ActivityPermission.GRANTED) return;
+      _activitySub = FlutterActivityRecognition.instance.activityStream.listen(
+        _onOsActivity,
+        onError: (_) {},
+      );
+    } catch (_) {
+      // No activity recognition support on this device/build — carry on without it.
+    }
+  }
+
+  void _onOsActivity(Activity activity) {
+    final trip = _trip;
+    if (trip == null) return;
+    final type = activity.type.name;
+    if (type == _lastOsActivityType) return; // log only on change
+    _lastOsActivityType = type;
+    trip.osActivity.add(OsActivity(
+      at: _now(),
+      type: type,
+      confidence: _confidencePct(activity.confidence),
+    ));
+    _persist();
+    _sendStats();
+  }
+
+  int _confidencePct(ActivityConfidence c) => switch (c) {
+        ActivityConfidence.HIGH => 95,
+        ActivityConfidence.MEDIUM => 65,
+        ActivityConfidence.LOW => 25,
+      };
 
   @override
   void onRepeatEvent(DateTime timestamp) {
@@ -119,6 +162,7 @@ class RecordingTaskHandler extends TaskHandler {
     final trip = _trip;
     if (trip == null) return;
     await _sub?.cancel();
+    await _activitySub?.cancel();
     trip.end = _now();
     await _sampleBattery(); // battery at stop
     await TripStorage.writeLast(trip);
@@ -130,6 +174,7 @@ class RecordingTaskHandler extends TaskHandler {
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     await _sub?.cancel();
+    await _activitySub?.cancel();
     final trip = _trip;
     // If we were destroyed without a clean stop, keep active_trip.json around
     // so the app can offer recovery on next launch.
@@ -171,6 +216,7 @@ class RecordingTaskHandler extends TaskHandler {
       'lastAccuracy': last?.accuracy ?? -1.0,
       'battery': trip.battery.isNotEmpty ? trip.battery.last.level : -1,
       'modality': _currentModality,
+      'osActivity': _lastOsActivityType,
     });
   }
 }

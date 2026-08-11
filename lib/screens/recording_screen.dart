@@ -23,6 +23,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
   double _lastAccuracy = -1; // m
   int _battery = -1;
   String _modality = 'walk';
+  String? _osActivity;
 
   bool _stopping = false;
   Timer? _stopTimeout;
@@ -52,6 +53,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
         _lastAccuracy = (data['lastAccuracy'] as num?)?.toDouble() ?? _lastAccuracy;
         _battery = (data['battery'] as num?)?.toInt() ?? _battery;
         _modality = (data['modality'] as String?) ?? _modality;
+        _osActivity = data['osActivity'] as String?;
       });
     } else if (event == 'stopped') {
       _finishAfterStop();
@@ -118,6 +120,15 @@ class _RecordingScreenState extends State<RecordingScreen> {
     }
   }
 
+  static const _osActivityLabelsNl = {
+    'WALKING': 'lopen',
+    'ON_BICYCLE': 'fiets',
+    'IN_VEHICLE': 'voertuig',
+    'RUNNING': 'rennen',
+    'STILL': 'stil',
+    'UNKNOWN': 'onbekend',
+  };
+
   String _fmtDuration(int sec) {
     final h = sec ~/ 3600;
     final m = (sec % 3600) ~/ 60;
@@ -148,6 +159,15 @@ class _RecordingScreenState extends State<RecordingScreen> {
                             fontSize: 28, fontWeight: FontWeight.bold)),
                   ],
                 ),
+                if (_osActivity != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'OS: ${_osActivityLabelsNl[_osActivity] ?? _osActivity}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 Text(_fmtDuration(_elapsedSec),
                     textAlign: TextAlign.center,
