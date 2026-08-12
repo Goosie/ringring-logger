@@ -33,6 +33,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.1"
+  bech32:
+    dependency: transitive
+    description:
+      name: bech32
+      sha256: "156cbace936f7720c79a79d16a03efad343b1ef17106716e04b8b8e39f99f7f7"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
+  bip340:
+    dependency: transitive
+    description:
+      name: bip340
+      sha256: "4c2df9fa2409d26f1d9334b2801015ebe4dc3978191f186743e60e89a90230c4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.1"
   boolean_selector:
     dependency: transitive
     description:
@@ -73,6 +89,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  convert:
+    dependency: transitive
+    description:
+      name: convert
+      sha256: b30acd5944035672bc15c6b7a8b47d773e41e2f17de064350988c5d02adb1c68
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.2"
   cross_file:
     dependency: transitive
     description:
@@ -97,6 +121,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.9"
+  dart_geohash:
+    dependency: "direct main"
+    description:
+      name: dart_geohash
+      sha256: c5594c0063ca67f37778b2c7d025d22e2ecd38741c0acd5b0f7596374e3309f2
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   dbus:
     dependency: transitive
     description:
@@ -105,6 +137,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.14"
+  elliptic:
+    dependency: transitive
+    description:
+      name: elliptic
+      sha256: "67931d408faa353bdebac9f7a1df0c3f6f828f4e8439cdf084573cd1601a2f4b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.12"
   fake_async:
     dependency: transitive
     description:
@@ -384,6 +424,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  nostr:
+    dependency: "direct main"
+    description:
+      name: nostr
+      sha256: "44d602199d032e40a469b8e00e3c58e1b0c206673e0edf4a4a468499f75f6298"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
   objective_c:
     dependency: transitive
     description:
@@ -552,6 +600,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  pointycastle:
+    dependency: transitive
+    description:
+      name: pointycastle
+      sha256: "92aa3841d083cc4b0f4709b5c74fd6409a3e6ba833ffc7dc6a8fee096366acf5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.0"
   pub_semver:
     dependency: transitive
     description:
@@ -789,6 +845,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  web_socket:
+    dependency: transitive
+    description:
+      name: web_socket
+      sha256: "34d64019aa8e36bf9842ac014bb5d2f5586ca73df5e4d9bf5c936975cae6982c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
+  web_socket_channel:
+    dependency: "direct main"
+    description:
+      name: web_socket_channel
+      sha256: d645757fb0f4773d602444000a8131ff5d48c9e47adfe9772652dd1a4f2d45c8
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.3"
   win32:
     dependency: transitive
     description:
