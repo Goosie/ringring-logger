@@ -4,6 +4,7 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter_activity_recognition/flutter_activity_recognition.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 
 import '../models/trip.dart';
 import 'trip_storage.dart';
@@ -34,6 +35,7 @@ class RecordingTaskHandler extends TaskHandler {
   int _tick = 0;
   String _currentModality = 'walk';
   String? _lastOsActivityType;
+  DateTime? _lastOsActivityWriteAt;
 
   DateTime _now() => DateTime.now().toUtc();
 
@@ -94,16 +96,36 @@ class RecordingTaskHandler extends TaskHandler {
   /// Activity and already happened in the UI's permission flow). Any failure
   /// (permission denied, plugin unavailable) leaves osActivity empty and the
   /// rest of the recording unaffected.
+  ///
+  /// Uses permission_handler (not FlutterActivityRecognition.checkPermission)
+  /// deliberately: this handler runs in the headless background FlutterEngine
+  /// that flutter_foreground_task spins up, which is never attached to an
+  /// Activity. flutter_activity_recognition's native checkPermission requires
+  /// `binding?.activity` to be non-null and otherwise throws
+  /// PlatformException(ACTIVITY_NOT_ATTACHED) — which the old try/catch here
+  /// swallowed silently on *every* recording, so activityStream was never
+  /// subscribed. permission_handler's status check only needs a Context and
+  /// works fine from this isolate.
   Future<void> _startActivityRecognition() async {
     try {
-      final permission = await FlutterActivityRecognition.instance.checkPermission();
-      if (permission != ActivityPermission.GRANTED) return;
+      final status = await ph.Permission.activityRecognition.status;
+      // DEBUG(osActivity): temporary — remove once the empty-osActivity issue
+      // is confirmed fixed.
+      print('[RRL:osActivity] permission status (background isolate) = $status');
+      if (!status.isGranted) {
+        print('[RRL:osActivity] permission not granted — activity recognition stays off');
+        return;
+      }
       _activitySub = FlutterActivityRecognition.instance.activityStream.listen(
         _onOsActivity,
-        onError: (_) {},
+        onError: (e) {
+          print('[RRL:osActivity] activityStream error: $e');
+        },
       );
-    } catch (_) {
+      print('[RRL:osActivity] subscribed to activityStream');
+    } catch (e) {
       // No activity recognition support on this device/build — carry on without it.
+      print('[RRL:osActivity] failed to start activity recognition: $e');
     }
   }
 
@@ -111,10 +133,22 @@ class RecordingTaskHandler extends TaskHandler {
     final trip = _trip;
     if (trip == null) return;
     final type = activity.type.name;
-    if (type == _lastOsActivityType) return; // log only on change
+    final now = _now();
+    // DEBUG(osActivity): log every incoming update, including repeats — lets us
+    // tell "stream never fires" apart from "stream fires but gets filtered out".
+    print('[RRL:osActivity] update: type=$type confidence=${activity.confidence} at=$now');
     _lastOsActivityType = type;
+
+    // Write every update rather than only on change, throttled to at most one
+    // entry per 10s. A strict change-only filter can make a live stream look
+    // empty if the reported activity never changes during a short test walk.
+    final lastWrite = _lastOsActivityWriteAt;
+    if (lastWrite != null && now.difference(lastWrite) < const Duration(seconds: 10)) {
+      return;
+    }
+    _lastOsActivityWriteAt = now;
     trip.osActivity.add(OsActivity(
-      at: _now(),
+      at: now,
       type: type,
       confidence: _confidencePct(activity.confidence),
     ));
@@ -163,6 +197,8 @@ class RecordingTaskHandler extends TaskHandler {
     if (trip == null) return;
     await _sub?.cancel();
     await _activitySub?.cancel();
+    print('[RRL:osActivity] activitySub cancelled (finalize) — '
+        '${trip.osActivity.length} entries this trip');
     trip.end = _now();
     await _sampleBattery(); // battery at stop
     await TripStorage.writeLast(trip);
@@ -175,6 +211,7 @@ class RecordingTaskHandler extends TaskHandler {
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     await _sub?.cancel();
     await _activitySub?.cancel();
+    print('[RRL:osActivity] activitySub cancelled (onDestroy, isTimeout=$isTimeout)');
     final trip = _trip;
     // If we were destroyed without a clean stop, keep active_trip.json around
     // so the app can offer recovery on next launch.
