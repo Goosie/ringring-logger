@@ -2,10 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// App version, mirrored from pubspec.yaml (version: 0.2.0+2).
+/// App version, mirrored from pubspec.yaml (version: 0.3.0+3).
 /// The publication pipeline reads pubspec; this constant only lands in the
 /// exported JSON's `appVersion` field.
-const String kAppVersion = '0.2.0+2';
+const String kAppVersion = '0.3.0+3';
 
 /// Formats a [DateTime] as UTC ISO-8601 with a trailing `Z` and *no*
 /// milliseconds, e.g. `2026-08-13T09:14:05Z`. Matches the legacy Ring-Ring
@@ -36,6 +36,31 @@ enum Modality {
 
   static Modality fromCode(String code) =>
       Modality.values.firstWhere((m) => m.code == code, orElse: () => Modality.walk);
+}
+
+/// Where on the body/bike the phone is carried during the trip. Affects how
+/// the motion sensors read for a given modality (handlebar vibration reads
+/// very differently from a jacket pocket), so it's captured up front and can
+/// be re-declared mid-trip via [PlacementSwitch].
+enum DevicePlacement {
+  handlebar('handlebar', 'Stuur', Icons.pedal_bike),
+  pocket('pocket', 'Broekzak', Icons.accessibility_new),
+  jacketPocket('jacket_pocket', 'Jaszak', Icons.dry_cleaning),
+  bag('bag', 'Tas', Icons.backpack),
+  hand('hand', 'Hand', Icons.back_hand);
+
+  const DevicePlacement(this.code, this.labelNl, this.icon);
+
+  /// Stable machine code used in the export.
+  final String code;
+
+  /// Dutch UI label.
+  final String labelNl;
+
+  final IconData icon;
+
+  static DevicePlacement fromCode(String code) => DevicePlacement.values
+      .firstWhere((p) => p.code == code, orElse: () => DevicePlacement.pocket);
 }
 
 /// A single GPS fix. Field names lat/lng/speed/date are intentionally identical
@@ -95,6 +120,83 @@ class ModalitySwitch {
       );
 }
 
+class PlacementSwitch {
+  PlacementSwitch({required this.at, required this.placement});
+
+  final DateTime at;
+  final String placement; // device placement code
+
+  Map<String, dynamic> toJson() => {'at': isoZ(at), 'placement': placement};
+
+  factory PlacementSwitch.fromJson(Map<String, dynamic> j) => PlacementSwitch(
+        at: DateTime.parse(j['at'] as String),
+        placement: j['placement'] as String,
+      );
+}
+
+/// Per-second summary of accelerometer/gyroscope/step-counter activity while
+/// recording. Raw samples are never persisted — only this aggregate. Any
+/// field is null when that sensor is unavailable on the device or hasn't
+/// produced enough data yet (e.g. accDomHz needs a filled FFT window).
+class MotionSample {
+  MotionSample({
+    required this.at,
+    required this.accRmsG,
+    required this.accStdG,
+    required this.accPeakG,
+    required this.accDomHz,
+    required this.accZcr,
+    required this.gyroRmsRad,
+    required this.gyroPeakRad,
+    required this.steps,
+    required this.sampleCount,
+    this.pressureHpa,
+  });
+
+  final DateTime at;
+  final double? accRmsG;
+  final double? accStdG;
+  final double? accPeakG;
+  final double? accDomHz;
+  final int? accZcr;
+  final double? gyroRmsRad;
+  final double? gyroPeakRad;
+  final int? steps;
+  final int sampleCount;
+
+  /// Atmospheric pressure in hPa, if this device has a barometer. Optional —
+  /// null on devices without one.
+  final double? pressureHpa;
+
+  Map<String, dynamic> toJson() => {
+        'at': isoZ(at),
+        'accRmsG': accRmsG,
+        'accStdG': accStdG,
+        'accPeakG': accPeakG,
+        'accDomHz': accDomHz,
+        'accZcr': accZcr,
+        'gyroRmsRad': gyroRmsRad,
+        'gyroPeakRad': gyroPeakRad,
+        'steps': steps,
+        'sampleCount': sampleCount,
+        'pressureHpa': pressureHpa,
+      };
+
+  factory MotionSample.fromJson(Map<String, dynamic> j) => MotionSample(
+        at: DateTime.parse(j['at'] as String),
+        accRmsG: (j['accRmsG'] as num?)?.toDouble(),
+        accStdG: (j['accStdG'] as num?)?.toDouble(),
+        accPeakG: (j['accPeakG'] as num?)?.toDouble(),
+        accDomHz: (j['accDomHz'] as num?)?.toDouble(),
+        accZcr: (j['accZcr'] as num?)?.toInt(),
+        gyroRmsRad: (j['gyroRmsRad'] as num?)?.toDouble(),
+        gyroPeakRad: (j['gyroPeakRad'] as num?)?.toDouble(),
+        steps: (j['steps'] as num?)?.toInt(),
+        sampleCount: (j['sampleCount'] as num?)?.toInt() ?? 0,
+        pressureHpa: (j['pressureHpa'] as num?)?.toDouble(),
+      );
+}
+
 class BatterySample {
   BatterySample({required this.at, required this.level});
 
@@ -135,16 +237,21 @@ class Trip {
     required this.note,
     required this.start,
     required this.declaredModality,
+    required this.devicePlacement,
     this.end,
     List<ModalitySwitch>? modalitySwitches,
     List<OsActivity>? osActivity,
     List<BatterySample>? battery,
     List<TripPoint>? points,
+    List<PlacementSwitch>? placementSwitches,
+    List<MotionSample>? motion,
     this.appVersion = kAppVersion,
   })  : modalitySwitches = modalitySwitches ?? [],
         osActivity = osActivity ?? [],
         battery = battery ?? [],
-        points = points ?? [];
+        points = points ?? [],
+        placementSwitches = placementSwitches ?? [],
+        motion = motion ?? [];
 
   final String id;
   final String appVersion;
@@ -153,10 +260,13 @@ class Trip {
   final DateTime start;
   DateTime? end;
   final String declaredModality; // modality code
+  final String devicePlacement; // device placement code
   final List<ModalitySwitch> modalitySwitches;
   final List<OsActivity> osActivity;
   final List<BatterySample> battery;
   final List<TripPoint> points;
+  final List<PlacementSwitch> placementSwitches;
+  final List<MotionSample> motion;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -170,6 +280,9 @@ class Trip {
         'osActivity': osActivity.map((e) => e.toJson()).toList(),
         'battery': battery.map((e) => e.toJson()).toList(),
         'points': points.map((e) => e.toJson()).toList(),
+        'devicePlacement': devicePlacement,
+        'placementSwitches': placementSwitches.map((e) => e.toJson()).toList(),
+        'motion': motion.map((e) => e.toJson()).toList(),
       };
 
   factory Trip.fromJson(Map<String, dynamic> j) => Trip(
@@ -180,6 +293,7 @@ class Trip {
         start: DateTime.parse(j['start'] as String),
         end: j['end'] == null ? null : DateTime.parse(j['end'] as String),
         declaredModality: j['declaredModality'] as String? ?? 'walk',
+        devicePlacement: j['devicePlacement'] as String? ?? 'pocket',
         modalitySwitches: ((j['modalitySwitches'] as List?) ?? [])
             .map((e) => ModalitySwitch.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -191,6 +305,12 @@ class Trip {
             .toList(),
         points: ((j['points'] as List?) ?? [])
             .map((e) => TripPoint.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        placementSwitches: ((j['placementSwitches'] as List?) ?? [])
+            .map((e) => PlacementSwitch.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        motion: ((j['motion'] as List?) ?? [])
+            .map((e) => MotionSample.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 

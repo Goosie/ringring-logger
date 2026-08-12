@@ -20,6 +20,7 @@ class StartScreen extends StatefulWidget {
 
 class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
   Modality? _modality;
+  DevicePlacement? _placement;
   final _noteCtrl = TextEditingController();
   final _labelCtrl = TextEditingController();
   PermissionStatus2? _perms;
@@ -129,8 +130,15 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
 
   Future<void> _start() async {
     final modality = _modality;
+    final placement = _placement;
     final perms = _perms;
-    if (modality == null || perms == null || !perms.canRecord || _starting) return;
+    if (modality == null ||
+        placement == null ||
+        perms == null ||
+        !perms.canRecord ||
+        _starting) {
+      return;
+    }
 
     setState(() => _starting = true);
     await _saveLabel();
@@ -140,6 +148,7 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
       deviceLabel: _labelCtrl.text.trim(),
       note: _noteCtrl.text.trim(),
       modality: modality.code,
+      devicePlacement: placement.code,
     );
 
     if (!mounted) return;
@@ -158,8 +167,11 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final perms = _perms;
-    final canStart =
-        _modality != null && perms != null && perms.canRecord && !_starting;
+    final canStart = _modality != null &&
+        _placement != null &&
+        perms != null &&
+        perms.canRecord &&
+        !_starting;
 
     return Scaffold(
       appBar: AppBar(title: const Text('RingRing Logger')),
@@ -171,6 +183,11 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             _modalityGrid(),
+            const SizedBox(height: 20),
+            const Text('Plaatsing telefoon',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _placementWrap(),
             const SizedBox(height: 20),
             TextField(
               controller: _noteCtrl,
@@ -199,10 +216,10 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
               color: canStart ? const Color(0xFF00E5A0) : Colors.grey.shade800,
               onPressed: canStart ? _start : null,
             ),
-            if (_modality == null)
+            if (_modality == null || _placement == null)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Text('Kies eerst een modaliteit.',
+                child: Text('Kies eerst een modaliteit en plaatsing.',
                     textAlign: TextAlign.center),
               ),
           ],
@@ -241,6 +258,28 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
                       fontSize: 18, fontWeight: FontWeight.bold)),
             ],
           ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _placementWrap() {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: DevicePlacement.values.map((p) {
+        final selected = _placement == p;
+        return ChoiceChip(
+          avatar: Icon(p.icon, size: 18, color: selected ? Colors.black : Colors.white),
+          label: Text(p.labelNl,
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? Colors.black : Colors.white)),
+          selected: selected,
+          selectedColor: const Color(0xFF00E5A0),
+          backgroundColor: Colors.grey.shade900,
+          onSelected: (_) => setState(() => _placement = p),
         );
       }).toList(),
     );

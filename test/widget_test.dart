@@ -16,6 +16,7 @@ void main() {
       note: 'stad',
       start: DateTime.utc(2026, 8, 13, 9, 14, 2),
       declaredModality: 'bike',
+      devicePlacement: 'handlebar',
     )
       ..points.add(TripPoint(
         lat: 52.3865343,

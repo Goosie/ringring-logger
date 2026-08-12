@@ -37,11 +37,14 @@ class TripService {
     required String deviceLabel,
     required String note,
     required String modality,
+    required String devicePlacement,
   }) async {
     await FlutterForegroundTask.saveData(key: kCfgId, value: id);
     await FlutterForegroundTask.saveData(key: kCfgDeviceLabel, value: deviceLabel);
     await FlutterForegroundTask.saveData(key: kCfgNote, value: note);
     await FlutterForegroundTask.saveData(key: kCfgModality, value: modality);
+    await FlutterForegroundTask.saveData(
+        key: kCfgDevicePlacement, value: devicePlacement);
 
     return FlutterForegroundTask.startService(
       serviceId: 42,
@@ -62,6 +65,13 @@ class TripService {
   static void switchModality(String modalityCode) {
     FlutterForegroundTask.sendDataToTask(
       {'command': 'switch', 'modality': modalityCode},
+    );
+  }
+
+  /// Register a device-placement switch within the running recording.
+  static void switchPlacement(String placementCode) {
+    FlutterForegroundTask.sendDataToTask(
+      {'command': 'switchPlacement', 'placement': placementCode},
     );
   }
 

@@ -24,6 +24,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
   int _battery = -1;
   String _modality = 'walk';
   String? _osActivity;
+  String _placement = 'pocket';
+  double? _accRmsG;
+  int? _steps;
 
   bool _stopping = false;
   Timer? _stopTimeout;
@@ -54,6 +57,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
         _battery = (data['battery'] as num?)?.toInt() ?? _battery;
         _modality = (data['modality'] as String?) ?? _modality;
         _osActivity = data['osActivity'] as String?;
+        _placement = (data['devicePlacement'] as String?) ?? _placement;
+        _accRmsG = (data['accRmsG'] as num?)?.toDouble();
+        _steps = (data['steps'] as num?)?.toInt();
       });
     } else if (event == 'stopped') {
       _finishAfterStop();
@@ -115,6 +121,41 @@ class _RecordingScreenState extends State<RecordingScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gewisseld naar ${chosen.labelNl}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _switchPlacement() async {
+    final chosen = await showModalBottomSheet<DevicePlacement>(
+      context: context,
+      backgroundColor: Colors.grey.shade900,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Plaatsing wisselen naar…',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            ...DevicePlacement.values.map((p) => ListTile(
+                  leading: Icon(p.icon, size: 30),
+                  title: Text(p.labelNl, style: const TextStyle(fontSize: 20)),
+                  trailing: p.code == _placement
+                      ? const Icon(Icons.check, color: Color(0xFF00E5A0))
+                      : null,
+                  onTap: () => Navigator.of(ctx).pop(p),
+                )),
+          ],
+        ),
+      ),
+    );
+    if (chosen != null && chosen.code != _placement) {
+      TripService.switchPlacement(chosen.code);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Plaatsing gewisseld naar ${chosen.labelNl}')),
         );
       }
     }
@@ -198,6 +239,14 @@ class _RecordingScreenState extends State<RecordingScreen> {
                           Icons.my_location),
                       _stat('Batterij', _battery < 0 ? '—' : '$_battery%',
                           Icons.battery_full),
+                      _stat('Stappen', _steps == null ? '—' : '$_steps',
+                          Icons.directions_walk),
+                      _stat(
+                          'Trilling',
+                          _accRmsG == null
+                              ? '—'
+                              : '${_accRmsG!.toStringAsFixed(3)} g',
+                          Icons.vibration),
                     ],
                   ),
                 ),
@@ -207,6 +256,13 @@ class _RecordingScreenState extends State<RecordingScreen> {
                   icon: Icons.swap_horiz,
                   color: Colors.blueGrey.shade700,
                   onPressed: _stopping ? null : _switchModality,
+                ),
+                const SizedBox(height: 12),
+                BigButton(
+                  label: 'PLAATSING WISSELEN',
+                  icon: Icons.swap_vert,
+                  color: Colors.blueGrey.shade700,
+                  onPressed: _stopping ? null : _switchPlacement,
                 ),
                 const SizedBox(height: 12),
                 BigButton(
