@@ -21,7 +21,10 @@ class RingRingConfig {
   /// "Post alle (gespreid)".
   static const int postDelayMaxSec = 30;
 
-  static const String relayUrl = 'wss://relay.goosielabs.com';
+  /// Relays that envelopes are submitted to and queried from. Fase 1 talks
+  /// to exactly one; add entries here to reach more later — NostrTransport
+  /// fans out to every relay in this list without needing code changes.
+  static const List<String> relayUrls = ['wss://relay.goosielabs.com'];
 
   /// Nostr event kind used for envelopes.
   static const int eventKind = 4451;
