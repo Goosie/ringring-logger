@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../delen/delen_screen.dart';
 import '../models/trip.dart';
 import '../services/trip_storage.dart';
 import '../widgets/big_button.dart';
@@ -109,6 +110,15 @@ class EndScreen extends StatelessWidget {
                 height: 80,
                 color: const Color(0xFF00E5A0),
                 onPressed: () => _export(context),
+              ),
+              const SizedBox(height: 12),
+              BigButton(
+                label: 'DELEN',
+                icon: Icons.share,
+                color: Colors.grey.shade800,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => DelenScreen(trip: trip)),
+                ),
               ),
               const SizedBox(height: 12),
               BigButton(
