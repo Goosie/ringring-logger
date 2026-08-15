@@ -4,15 +4,13 @@
 class RingRingConfig {
   const RingRingConfig._();
 
-  /// Geohash length used to cut a trip into segments.
-  static const int geohashPrecisie = 7;
-
   /// Route distance (meters) trimmed off the start and end of a trip
-  /// before segmentation, measured along consecutive GPS fixes.
+  /// before corridor-matching for publication, measured along consecutive
+  /// GPS fixes. Keeps claims near home/work — the two points that identify
+  /// a person fastest — out of what gets sent at all. Segment-level
+  /// thresholds (min samples/coverage) live in QuillParams; this is a
+  /// publish-flow privacy concern, not a map-matching one.
   static const double trimAfstandMeter = 300;
-
-  /// Segments with fewer GPS fixes than this are dropped entirely.
-  static const int minSamplesPerSegment = 30;
 
   /// Envelopes only ever carry a day-level date, never a timestamp.
   static const String tijdResolutie = 'dag';
@@ -31,6 +29,14 @@ class RingRingConfig {
 
   /// Envelope schema version, carried in the `v` tag.
   static const String envelopVersie = '1';
+
+  /// The gift wrap's recipient (NIP-59 `p` tag) — the "Ring-Ring address".
+  /// This is a fresh, throwaway TEST keypair generated for this phase, not
+  /// the eventual production identity (that's still an open governance
+  /// question — see the Stamp Office discussion). Hex-encoded pubkey;
+  /// corresponding nsec was shared with Perry directly, never committed.
+  static const String recipientPubkey =
+      '419f5d9b4e1a79a5d893bfdc7a57abed9b183381c0f01452ec6fa56c637d6c8c';
 
   /// Segments with fewer samples than this get a "laag verkeer — hoger
   /// risico" warning in the UI. This is a risk label only, not a filter —

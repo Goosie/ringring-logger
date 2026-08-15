@@ -1,19 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../claims/claims_storage.dart';
+import '../claims/trip_track_points.dart';
 import '../delen/delen_screen.dart';
 import '../models/trip.dart';
 import '../services/trip_storage.dart';
 import '../widgets/big_button.dart';
+import 'claims_screen.dart';
 import 'start_screen.dart';
 
-class EndScreen extends StatelessWidget {
+class EndScreen extends StatefulWidget {
   const EndScreen({super.key, required this.trip, this.recovered = false});
 
   final Trip trip;
 
   /// True when this trip was recovered from an interrupted recording.
   final bool recovered;
+
+  @override
+  State<EndScreen> createState() => _EndScreenState();
+}
+
+class _EndScreenState extends State<EndScreen> {
+  Trip get trip => widget.trip;
+  bool get recovered => widget.recovered;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fire-and-forget: precompute + persist corridor claims right after the
+    // recording stops, so opening the Claims screen is instant. A debug
+    // import re-triggers the same computation for its own generated id.
+    ClaimsStorage.loadOrCompute(trip.id, trackPointsFromTrip(trip));
+  }
 
   String _fmtDuration(Duration d) {
     final h = d.inHours;
@@ -113,11 +133,27 @@ class EndScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               BigButton(
+                label: 'CLAIMS',
+                icon: Icons.route,
+                color: Colors.grey.shade800,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ClaimsScreen(
+                      claimsId: trip.id,
+                      points: trackPointsFromTrip(trip),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              BigButton(
                 label: 'DELEN',
                 icon: Icons.share,
                 color: Colors.grey.shade800,
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => DelenScreen(trip: trip)),
+                  MaterialPageRoute(
+                    builder: (_) => DelenScreen(points: trackPointsFromTrip(trip)),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

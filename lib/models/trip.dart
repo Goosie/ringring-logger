@@ -2,10 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// App version, mirrored from pubspec.yaml (version: 0.3.0+3).
+/// App version, mirrored from pubspec.yaml (version: 0.4.0+4).
 /// The publication pipeline reads pubspec; this constant only lands in the
 /// exported JSON's `appVersion` field.
-const String kAppVersion = '0.3.0+3';
+const String kAppVersion = '0.4.0+4';
 
 /// Formats a [DateTime] as UTC ISO-8601 with a trailing `Z` and *no*
 /// milliseconds, e.g. `2026-08-13T09:14:05Z`. Matches the legacy Ring-Ring
@@ -320,6 +320,19 @@ class Trip {
       (end ?? (points.isNotEmpty ? points.last.date : start)).difference(start);
 
   int get fixCount => points.length;
+
+  /// The modality code in effect at [at]: the most recent switch at or
+  /// before that moment, or [declaredModality] if none happened yet.
+  /// Assumes [modalitySwitches] is chronological, which it is — the
+  /// recorder only ever appends to it live.
+  String modalityAt(DateTime at) {
+    var modality = declaredModality;
+    for (final s in modalitySwitches) {
+      if (s.at.isAfter(at)) break;
+      modality = s.modality;
+    }
+    return modality;
+  }
 
   /// Total distance in km as a haversine sum over consecutive points.
   double get distanceKm {

@@ -21,7 +21,11 @@
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
     <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION"/>
 
-    <!-- BEWUST GEEN netwerk-permissie: de app stuurt geen enkele byte naar buiten. -->
+    <!-- Netwerk: uitsluitend voor de opt-in DELEN-flow (websocket naar Nostr-relays
+         om afgeleide, geschrobde claims te posten). Tijdens het meten zelf gebeurt
+         er geen netwerkverkeer — de opname blijft lokaal tot de gebruiker zelf op
+         DELEN drukt. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="RingRing Logger"

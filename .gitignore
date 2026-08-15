@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Testdata: geëxporteerde trip-JSON's zijn ruwe GPS-sporen (echte ritten van
+# jezelf) en horen net zo min in git als op een server. Alleen lokaal.
+/testdata/trips/*.json

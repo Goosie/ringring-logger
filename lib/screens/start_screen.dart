@@ -1,12 +1,18 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../claims/import_trip_json.dart';
 import '../models/trip.dart';
 import '../services/permissions.dart';
 import '../services/trip_service.dart';
 import '../widgets/big_button.dart';
+import 'claims_screen.dart';
+import 'received_envelopes_screen.dart';
 import 'recording_screen.dart';
 
 const _kPrefDeviceLabel = 'device_label';
@@ -104,6 +110,69 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
     await _refreshPerms();
   }
 
+  /// Debug entry point (long-press the app bar title): choose between
+  /// importing a trip JSON or inspecting what's on the relay for a given
+  /// key. Both are dev-only tools, kept behind the same gesture.
+  Future<void> _showDebugMenu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.file_open),
+              title: const Text('Importeer trip JSON'),
+              subtitle: const Text('Rit-export door de corridor-pijplijn halen, zonder te rijden'),
+              onTap: () => Navigator.of(ctx).pop('import'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_open),
+              title: const Text('Ontvangen enveloppen'),
+              subtitle: const Text('Kind-1059 gift wraps ontgrendelen met een zelf ingevoerde nsec'),
+              onTap: () => Navigator.of(ctx).pop('received'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'import':
+        await _importDebugTrip();
+      case 'received':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ReceivedEnvelopesScreen()),
+        );
+    }
+  }
+
+  Future<void> _importDebugTrip() async {
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (files.isEmpty) return;
+    final path = files.single.path;
+    if (path == null) return;
+
+    try {
+      final points = parseTripJsonForImport(await File(path).readAsString());
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ClaimsScreen(
+            claimsId: 'import-${const Uuid().v4()}',
+            points: points,
+            subtitle: 'geïmporteerd: ${path.split(Platform.pathSeparator).last}',
+          ),
+        ),
+      );
+    } catch (e) {
+      _snack('Import mislukt: $e');
+    }
+  }
+
   Future<bool?> _explainBackground() {
     return showDialog<bool>(
       context: context,
@@ -174,7 +243,12 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
         !_starting;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('RingRing Logger')),
+      appBar: AppBar(
+        title: GestureDetector(
+          onLongPress: _showDebugMenu,
+          child: const Text('RingRing Logger'),
+        ),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

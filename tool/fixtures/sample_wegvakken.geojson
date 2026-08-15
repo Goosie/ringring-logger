@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "synthetic": true,
+  "note": "SYNTHETIC fixture — hand-drawn, not real NWB data. Used by tool/build_registry.py only when the PDOK NWB WFS is unreachable or its schema changed unexpectedly. Coordinates are plausible but fictional street shapes inside the same bbox as the real registry (lat 52.254-52.274, lng 4.618-4.650, Nieuw-Vennep).",
+  "features": [
+    { "type": "Feature", "properties": { "id": "SYN-001", "name": "Teststraat Noord" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6210, 52.2560], [4.6225, 52.2572]] } },
+    { "type": "Feature", "properties": { "id": "SYN-002", "name": "Teststraat Zuid" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6480, 52.2720], [4.6495, 52.2730]] } },
+    { "type": "Feature", "properties": { "id": "SYN-003", "name": "Testkade" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6250, 52.2650], [4.6270, 52.2650], [4.6290, 52.2650]] } },
+    { "type": "Feature", "properties": { "id": "SYN-004", "name": "Testplein West" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6220, 52.2600], [4.6230, 52.2610]] } },
+    { "type": "Feature", "properties": { "id": "SYN-005", "name": "Testlaan Oost" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6440, 52.2680], [4.6450, 52.2690]] } },
+    { "type": "Feature", "properties": { "id": "SYN-006", "name": "Testweg Centrum" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6330, 52.2630], [4.6340, 52.2640], [4.6350, 52.2650]] } },
+    { "type": "Feature", "properties": { "id": "SYN-007", "name": "Teststraat Brug" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6300, 52.2590], [4.6310, 52.2600]] } },
+    { "type": "Feature", "properties": { "id": "SYN-008", "name": "Testsingel" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6380, 52.2700], [4.6395, 52.2710]] } },
+    { "type": "Feature", "properties": { "id": "SYN-009", "name": "Testdreef" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6350, 52.2560], [4.6360, 52.2570]] } },
+    { "type": "Feature", "properties": { "id": "SYN-010", "name": "Testpad" },
+      "geometry": { "type": "LineString", "coordinates": [[4.6250, 52.2730], [4.6265, 52.2735]] } }
+  ]
+}

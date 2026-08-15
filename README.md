@@ -8,15 +8,19 @@ om later een modaliteitsclassifier tegen af te zetten.
 Het is een meetinstrument, geen consumenten-app. Gebouwd voor een fietsrit op
 **donderdag 13 augustus 2026**.
 
-## Absolute eis: geen netwerk
+## Netwerk: alleen opt-in, alleen voor DELEN
 
-De app stuurt **geen enkele byte** naar een server. Er is geen http-client,
-analytics, crash-reporting of sync. De `INTERNET`-permissie staat **niet** in het
-manifest — ook niet in de debug- en profile-varianten. Export gebeurt uitsluitend
-via een lokaal JSON-bestand dat de gebruiker zelf deelt (Android-deelmenu).
+Tijdens het **meten** stuurt de app geen enkele byte naar een server: geen
+http-client, analytics, crash-reporting of sync. De ruwe rit (GPS-punten,
+sensordata) verlaat het toestel nooit. Export naar JSON gaat uitsluitend via
+een lokaal bestand dat de gebruiker zelf deelt (Android-deelmenu).
 
-> Gevolg van het weglaten van `INTERNET` in debug: **hot reload over het netwerk
-> werkt niet**. Bouw en installeer de APK om te testen (zie hieronder).
+Er is één bewuste, opt-in uitzondering: het **DELEN**-scherm op het eindscherm.
+Dat knipt de rit in corridor/uur/modaliteit-claims (nooit ruwe coördinaten) en
+post die, alleen als de gebruiker daar zelf op drukt, via een websocket naar
+Nostr-relays (zie `lib/delen/`, `lib/transport/`). Daarvoor staat de
+`INTERNET`-permissie in het manifest — nergens anders in de app wordt hij
+gebruikt.
 
 ## Wat de app doet
 
@@ -62,11 +66,10 @@ pure weergave die live-statistieken ontvangt via `sendDataToMain` en commando's
 | `POST_NOTIFICATIONS` | meet-notificatie tonen (Android 13+) |
 | `WAKE_LOCK` | CPU wakker houden zodat samplen doorloopt met scherm uit |
 | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | systeemdialoog om batterijoptimalisatie uit te zetten |
+| `INTERNET` | uitsluitend de opt-in DELEN-flow: claims posten naar Nostr-relays |
 
 `RECEIVE_BOOT_COMPLETED` wordt door `flutter_foreground_task` toegevoegd; de app
 gebruikt géén auto-start op boot (`autoRunOnBoot: false`).
-
-**Nadrukkelijk NIET aanwezig:** `INTERNET`.
 
 ### Runtime-permissieflow (Android 11+)
 
