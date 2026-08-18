@@ -47,3 +47,11 @@ app.*.map.json
 # Testdata: geëxporteerde trip-JSON's zijn ruwe GPS-sporen (echte ritten van
 # jezelf) en horen net zo min in git als op een server. Alleen lokaal.
 /testdata/trips/*.json
+
+# Signing en secrets (nooit committen)
+android/key.properties
+*.jks
+*.keystore
+*.pem
+.env
+.env.*
