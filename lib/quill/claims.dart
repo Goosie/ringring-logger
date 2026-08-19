@@ -97,10 +97,13 @@ List<CorridorClaim> deriveClaims(List<CorridorTraversal> traversals, Registry re
 ///
 /// Bucket the traversal's points into non-overlapping
 /// [QuillParams.rollingWindowSeconds] windows (elapsed time from the
-/// traversal's first point), take the median speed per window, classify
-/// each window "bike" when its median falls in
+/// traversal's first point), take the median speed per window, drop
+/// windows whose median is below [QuillParams.modalityStillMaxKmh] (a
+/// stationary window — a queue, a red light — says nothing about the mode
+/// of transport, so it neither counts as "bike" nor as "other"), classify
+/// each remaining window "bike" when its median falls in
 /// [QuillParams.bikeMinKmh, QuillParams.bikeMaxKmh) — else "other" — and
-/// let the windows vote (ties go to "bike"). This is a coarse speed-only
+/// let those windows vote (ties go to "bike"). This is a coarse speed-only
 /// proxy, not the sensor-based classifier described in the app's README;
 /// revise the band in params.dart if it disagrees with declared ground
 /// truth from testdata/trips/.
@@ -109,12 +112,18 @@ String classifyModality(List<TrackPoint> sortedPoints) {
   var bikeVotes = 0;
   var otherVotes = 0;
   for (final median in windows) {
+    if (median < QuillParams.modalityStillMaxKmh) continue;
     if (median >= QuillParams.bikeMinKmh && median < QuillParams.bikeMaxKmh) {
       bikeVotes++;
     } else {
       otherVotes++;
     }
   }
+  // If every window was stationary (the traversal was essentially a full
+  // stop — e.g. gridlock the whole way through), there's no motion signal
+  // to vote on. Default to "other" rather than crashing, returning null,
+  // or falling back to the unfiltered windows.
+  if (bikeVotes == 0 && otherVotes == 0) return 'other';
   return bikeVotes >= otherVotes ? 'bike' : 'other';
 }
 

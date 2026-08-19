@@ -24,4 +24,10 @@ class QuillParams {
 
   /// Upper bound (exclusive, km/h) of the speed band classified as "bike".
   static const double bikeMaxKmh = 25;
+
+  /// Windows with a median speed below this value take no part in the
+  /// modality vote. Standing still says nothing about the mode of
+  /// transport; without this exclusion, busy intersections systematically
+  /// tip toward "other".
+  static const double modalityStillMaxKmh = 3.0;
 }

@@ -82,6 +82,49 @@ void main() {
     expect(claims.map((c) => c.corridorId), ['ALPHA', 'ZEBRA']);
   });
 
+  group('classifyModality stationary-window exclusion (Zuiderdreef case)', () {
+    test('mostly-stopped intersection queue with a burst of bike speed classifies as bike', () {
+      // ~244 points, ~85% at a dead stop (0-2 km/h, a queue at a red
+      // light) and ~15% at bike speed (16-20 km/h). One point per second,
+      // so with a 60s window this spans several windows, most of which
+      // are entirely stationary.
+      //
+      // Before the fix: stationary windows had a median under bikeMinKmh
+      // (6) and voted "other", so the stationary majority outvoted the
+      // one moving window and this returned "other" even though v85
+      // showed clear bike speed — the Zuiderdreef bug.
+      final points = <TrackPoint>[];
+      var t = 0;
+      for (var i = 0; i < 207; i++) {
+        points.add(_pt(0, t, speedKmh: 0.5 + (i % 3) * 0.5)); // 0.5-1.5 km/h
+        t++;
+      }
+      for (var i = 0; i < 37; i++) {
+        points.add(_pt(0, t, speedKmh: 16 + (i % 5))); // 16-20 km/h
+        t++;
+      }
+      final traversal = CorridorTraversal(corridorId: 'ZUIDERDREEF', points: points);
+      final registry = _registryWith([_corridor('ZUIDERDREEF', 110)]);
+
+      final claims = deriveClaims([traversal], registry);
+      expect(claims, hasLength(1));
+      final claim = claims.single;
+
+      expect(claim.modality, 'bike');
+      expect(claim.v85, greaterThanOrEqualTo(6));
+    });
+
+    test('fully stationary traversal returns "other" without crashing', () {
+      final points = [for (var i = 0; i < 60; i++) _pt(0, i, speedKmh: 1.0)];
+      final traversal = CorridorTraversal(corridorId: 'GRIDLOCK', points: points);
+      final registry = _registryWith([_corridor('GRIDLOCK', 110)]);
+
+      final claims = deriveClaims([traversal], registry);
+      expect(claims, hasLength(1));
+      expect(claims.single.modality, 'other');
+    });
+  });
+
   test('serialized claims never contain coordinate keys', () {
     final registry = _registryWith([_corridor('NOCOORDS', 1)]);
     final traversal = CorridorTraversal(corridorId: 'NOCOORDS', points: [_pt(0, 0), _pt(50, 1)]);
