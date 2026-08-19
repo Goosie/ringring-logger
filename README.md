@@ -1,5 +1,13 @@
 # RingRing Logger
 
+> Dit is een prototype / meetinstrument in ontwikkeling, geen productiesoftware.
+> Interfaces, envelop-schema en corridorregistry veranderen zonder migratiepad.
+> Wie hierop wil voortbouwen: lees eerst [docs/beslissingen.md](docs/beslissingen.md).
+> Verschillende constanten in deze code zien eruit als vrij afstembare waarden
+> maar zijn privacy-garanties; ze aanpassen zonder de reden te kennen breekt
+> het ontwerp.
+> Licentie: Apache License 2.0, zie [LICENSE](LICENSE) en [NOTICE](NOTICE).
+
 Een **lokaal meetinstrument** (Flutter, alleen Android) dat tijdens verplaatsingen
 sensor-, locatie- en batterijgegevens logt, met een **vooraf opgegeven
 modaliteitslabel** (Lopen / Fiets / Auto / OV). Doel: grondwaarheid verzamelen
@@ -160,7 +168,21 @@ lib/
   widgets/big_button.dart
 ```
 
+`docs/beslissingen.md` — genummerde architectuurbeslissingen: wat er gekozen
+is, waarom, wat breekt als je het terugdraait, en waar in de code.
+
 ## Toegevoegde dependencies
 
 `geolocator`, `flutter_foreground_task`, `battery_plus`, `share_plus`,
 `permission_handler`, `path_provider`, `uuid`, `shared_preferences`.
+
+## Licentie
+
+Apache License 2.0, copyright 2026 Perry Smit — zie [LICENSE](LICENSE). Bij
+hergebruik of afgeleid werk moet het [NOTICE](NOTICE)-bestand mee.
+
+Wegvakdata (NWB) komt van PDOK / Rijkswaterstaat onder CC0 1.0 en valt niet
+onder de Apache-licentie van deze code.
+
+Dit is experimentele software, zonder garantie ("AS IS"); gebruik in
+productie is voor eigen rekening.
