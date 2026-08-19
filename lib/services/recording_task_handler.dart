@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:battery_plus/battery_plus.dart';
-import 'package:fftea/fftea.dart';
 import 'package:flutter_activity_recognition/flutter_activity_recognition.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
@@ -11,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:sensors_plus/sensors_plus.dart';
 
 import '../models/trip.dart';
+import 'motion_window.dart';
 import 'trip_storage.dart';
 
 /// Config keys written to FlutterForegroundTask storage by the UI before the
@@ -20,13 +20,13 @@ const String kCfgDeviceLabel = 'cfg_device_label';
 const String kCfgNote = 'cfg_note';
 const String kCfgModality = 'cfg_modality';
 const String kCfgDevicePlacement = 'cfg_device_placement';
+const String kCfgVehicleClass = 'cfg_vehicle_class';
+const String kCfgPhonePlacement = 'cfg_phone_placement';
+const String kCfgRouteId = 'cfg_route_id';
+const String kCfgRunIndex = 'cfg_run_index';
 
 /// Standard gravity, used to convert accelerometer m/s² readings to g.
 const double _kGravityMs2 = 9.80665;
-
-/// FFT window size for [RecordingTaskHandler._computeDominantHz], in samples.
-/// At the ~50Hz accelerometer sampling rate this spans roughly 2.5s.
-const int _kFftWindowSize = 128;
 
 /// Entry point that the OS/plugin invokes in the *background isolate*. Must be a
 /// top-level function marked with the vm:entry-point pragma.
@@ -56,18 +56,19 @@ class RecordingTaskHandler extends TaskHandler {
 
   // ---- Motion sensor state (background isolate only; never persisted raw) ----
 
+  /// Monotonic clock (immune to wall-clock adjustments) used to timestamp
+  /// every accelerometer sample, so per-window fsHz/resampling reflect the
+  /// real sensor rate rather than wall-clock jumps.
+  final Stopwatch _clock = Stopwatch()..start();
+
   /// (magnitude - 1g) accelerometer samples collected since the last
-  /// per-second flush. Cleared on every flush.
+  /// per-second flush, paired with their [_clock] timestamp in microseconds.
+  /// Cleared on every flush.
   final List<double> _secAccDeltaG = [];
+  final List<int> _secAccTimeUs = [];
 
   /// Gyroscope angular-velocity magnitude samples (rad/s) since the last flush.
   final List<double> _secGyroMagRad = [];
-
-  /// Rolling buffer of the last [_kFftWindowSize] accelerometer
-  /// (magnitude - 1g) samples, independent of the 1s flush boundary — used
-  /// only for the dominant-frequency FFT.
-  final List<double> _fftAccDeltaG = [];
-  final List<DateTime> _fftAccTimestamps = [];
 
   double? _lastAccRmsG; // for live stats display
   double? _lastPressureHpa;
@@ -88,6 +89,16 @@ class RecordingTaskHandler extends TaskHandler {
     final placement =
         await FlutterForegroundTask.getData<String>(key: kCfgDevicePlacement) ??
             'pocket';
+    final vehicleClass =
+        await FlutterForegroundTask.getData<String>(key: kCfgVehicleClass) ??
+            'other';
+    final phonePlacement =
+        await FlutterForegroundTask.getData<String>(key: kCfgPhonePlacement) ??
+            'other';
+    final routeId =
+        await FlutterForegroundTask.getData<String>(key: kCfgRouteId) ?? '';
+    final runIndex =
+        await FlutterForegroundTask.getData<int>(key: kCfgRunIndex) ?? 1;
 
     _currentModality = modality;
     _currentPlacement = placement;
@@ -98,6 +109,12 @@ class RecordingTaskHandler extends TaskHandler {
       start: _now(),
       declaredModality: modality,
       devicePlacement: placement,
+      label: TripLabel(
+        vehicleClass: vehicleClass,
+        phonePlacement: phonePlacement,
+        routeId: routeId,
+        runIndex: runIndex,
+      ),
     );
 
     await _sampleBattery(); // battery at start
@@ -240,14 +257,8 @@ class RecordingTaskHandler extends TaskHandler {
 
   void _onAccelEvent(AccelerometerEvent e) {
     final magG = math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z) / _kGravityMs2;
-    final deltaG = magG - 1.0;
-    _secAccDeltaG.add(deltaG);
-    _fftAccDeltaG.add(deltaG);
-    _fftAccTimestamps.add(_now());
-    if (_fftAccDeltaG.length > _kFftWindowSize) {
-      _fftAccDeltaG.removeAt(0);
-      _fftAccTimestamps.removeAt(0);
-    }
+    _secAccDeltaG.add(magG - 1.0);
+    _secAccTimeUs.add(_clock.elapsedMicroseconds);
   }
 
   void _onGyroEvent(GyroscopeEvent e) {
@@ -268,21 +279,7 @@ class RecordingTaskHandler extends TaskHandler {
     if (trip == null) return;
 
     final n = _secAccDeltaG.length;
-    double? accRms, accStd, accPeak;
-    int? accZcr;
-    if (n > 0) {
-      final sumSq = _secAccDeltaG.fold(0.0, (s, v) => s + v * v);
-      accRms = math.sqrt(sumSq / n);
-      final mean = _secAccDeltaG.fold(0.0, (s, v) => s + v) / n;
-      final varSum = _secAccDeltaG.fold(0.0, (s, v) => s + (v - mean) * (v - mean));
-      accStd = math.sqrt(varSum / n);
-      accPeak = _secAccDeltaG.fold<double>(0.0, (m, v) => v.abs() > m ? v.abs() : m);
-      accZcr = 0;
-      for (var i = 1; i < n; i++) {
-        if ((_secAccDeltaG[i - 1] < 0) != (_secAccDeltaG[i] < 0)) accZcr = accZcr! + 1;
-      }
-    }
-    final accDomHz = _computeDominantHz();
+    final acc = computeAccWindow(_secAccTimeUs, _secAccDeltaG);
 
     final gyroN = _secGyroMagRad.length;
     double? gyroRms, gyroPeak;
@@ -303,52 +300,27 @@ class RecordingTaskHandler extends TaskHandler {
 
     trip.motion.add(MotionSample(
       at: _now(),
-      accRmsG: accRms,
-      accStdG: accStd,
-      accPeakG: accPeak,
-      accDomHz: accDomHz,
-      accZcr: accZcr,
+      accRmsG: acc.accRmsG,
+      accStdG: acc.accStdG,
+      accPeakG: acc.accPeakG,
+      accP95G: acc.accP95G,
+      accDomHz: acc.accDomHz,
+      accZcr: acc.accZcr,
+      accZcrHz: acc.accZcrHz,
       gyroRmsRad: gyroRms,
       gyroPeakRad: gyroPeak,
       steps: steps,
       sampleCount: n,
+      windowSecs: acc.windowSecs,
+      fsHz: acc.fsHz,
+      degraded: acc.degraded,
       pressureHpa: _lastPressureHpa,
     ));
 
-    _lastAccRmsG = accRms;
+    _lastAccRmsG = acc.accRmsG;
     _secAccDeltaG.clear();
+    _secAccTimeUs.clear();
     _secGyroMagRad.clear();
-  }
-
-  /// Dominant frequency of the accelerometer magnitude signal via FFT over
-  /// the last [_kFftWindowSize] samples, or null if the rolling buffer isn't
-  /// full yet or anything goes wrong — zero-crossing rate (accZcr) already
-  /// gives a usable approximation, so failures here are never fatal.
-  double? _computeDominantHz() {
-    if (_fftAccDeltaG.length < _kFftWindowSize) return null;
-    try {
-      final fft = FFT(_kFftWindowSize);
-      final freqDomain = fft.realFft(_fftAccDeltaG);
-      final mags = freqDomain.magnitudes();
-
-      final elapsedUs =
-          _fftAccTimestamps.last.difference(_fftAccTimestamps.first).inMicroseconds;
-      if (elapsedUs <= 0) return null;
-      final sampleRateHz = (_kFftWindowSize - 1) * 1e6 / elapsedUs;
-
-      var bestBin = 1;
-      var bestMag = -1.0;
-      final nyquistBin = _kFftWindowSize ~/ 2;
-      for (var i = 1; i < nyquistBin; i++) {
-        if (mags[i] > bestMag) {
-          bestMag = mags[i];
-          bestBin = i;
-        }
-      }
-      return bestBin * sampleRateHz / _kFftWindowSize;
-    } catch (_) {
-      return null;
-    }
   }
 
   @override

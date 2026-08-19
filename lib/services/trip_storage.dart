@@ -70,14 +70,17 @@ class TripStorage {
   }
 
   /// Writes the export file with the schema-defined name and returns it for
-  /// sharing: `trip-YYYYMMDD-HHMMSS-<modality>-<deviceLabel>.json`
+  /// sharing:
+  /// `trip-YYYYMMDD-HHMMSS-<vehicleClass>-<phonePlacement>-r<runIndex>.json`
   static Future<File> writeExport(Trip trip) async {
     final u = trip.start.toUtc();
     String two(int n) => n.toString().padLeft(2, '0');
     final stamp = '${u.year.toString().padLeft(4, '0')}${two(u.month)}${two(u.day)}'
         '-${two(u.hour)}${two(u.minute)}${two(u.second)}';
-    final label = _sanitize(trip.deviceLabel.isEmpty ? 'toestel' : trip.deviceLabel);
-    final name = 'trip-$stamp-${trip.declaredModality}-$label.json';
+    final vehicleClass = _sanitize(trip.label.vehicleClass);
+    final phonePlacement = _sanitize(trip.label.phonePlacement);
+    final name =
+        'trip-$stamp-$vehicleClass-$phonePlacement-r${trip.label.runIndex}.json';
     final f = File('${(await _dir()).path}/$name');
     await f.writeAsString(jsonEncode(trip.toJson()), flush: true);
     return f;

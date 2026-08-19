@@ -38,6 +38,10 @@ class TripService {
     required String note,
     required String modality,
     required String devicePlacement,
+    required String vehicleClass,
+    required String phonePlacement,
+    required String routeId,
+    required int runIndex,
   }) async {
     await FlutterForegroundTask.saveData(key: kCfgId, value: id);
     await FlutterForegroundTask.saveData(key: kCfgDeviceLabel, value: deviceLabel);
@@ -45,6 +49,11 @@ class TripService {
     await FlutterForegroundTask.saveData(key: kCfgModality, value: modality);
     await FlutterForegroundTask.saveData(
         key: kCfgDevicePlacement, value: devicePlacement);
+    await FlutterForegroundTask.saveData(key: kCfgVehicleClass, value: vehicleClass);
+    await FlutterForegroundTask.saveData(
+        key: kCfgPhonePlacement, value: phonePlacement);
+    await FlutterForegroundTask.saveData(key: kCfgRouteId, value: routeId);
+    await FlutterForegroundTask.saveData(key: kCfgRunIndex, value: runIndex);
 
     return FlutterForegroundTask.startService(
       serviceId: 42,

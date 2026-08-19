@@ -2,18 +2,16 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../claims/import_trip_json.dart';
 import '../models/trip.dart';
 import '../services/permissions.dart';
-import '../services/trip_service.dart';
 import '../widgets/big_button.dart';
 import 'claims_screen.dart';
+import 'label_screen.dart';
 import 'received_envelopes_screen.dart';
-import 'recording_screen.dart';
 
 const _kPrefDeviceLabel = 'device_label';
 
@@ -211,26 +209,20 @@ class _StartScreenState extends State<StartScreen> with WidgetsBindingObserver {
 
     setState(() => _starting = true);
     await _saveLabel();
-
-    final result = await TripService.start(
-      id: const Uuid().v4(),
-      deviceLabel: _labelCtrl.text.trim(),
-      note: _noteCtrl.text.trim(),
-      modality: modality.code,
-      devicePlacement: placement.code,
-    );
-
     if (!mounted) return;
     setState(() => _starting = false);
 
-    if (result is ServiceRequestSuccess) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const RecordingScreen()),
-      );
-    } else {
-      _snack('Kon de meting niet starten. Controleer de permissies.');
-      await _refreshPerms();
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LabelScreen(
+          tripId: const Uuid().v4(),
+          deviceLabel: _labelCtrl.text.trim(),
+          note: _noteCtrl.text.trim(),
+          modality: modality.code,
+          devicePlacement: placement.code,
+        ),
+      ),
+    );
   }
 
   @override

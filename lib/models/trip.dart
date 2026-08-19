@@ -2,10 +2,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// App version, mirrored from pubspec.yaml (version: 0.4.0+4).
+/// App version, mirrored from pubspec.yaml (version: 0.5.0+5).
 /// The publication pipeline reads pubspec; this constant only lands in the
 /// exported JSON's `appVersion` field.
-const String kAppVersion = '0.4.0+4';
+const String kAppVersion = '0.5.0+5';
+
+/// Export schema version. Bumped from the implicit 1 to 2 when the per-second
+/// motion summary gained fs-normalized frequency features (windowSecs, fsHz,
+/// accP95G, accZcrHz, degraded) and the structured `label` object replaced
+/// free-text vehicle/placement labeling.
+const int kSchemaVersion = 2;
 
 /// Formats a [DateTime] as UTC ISO-8601 with a trailing `Z` and *no*
 /// milliseconds, e.g. `2026-08-13T09:14:05Z`. Matches the legacy Ring-Ring
@@ -61,6 +67,106 @@ enum DevicePlacement {
 
   static DevicePlacement fromCode(String code) => DevicePlacement.values
       .firstWhere((p) => p.code == code, orElse: () => DevicePlacement.pocket);
+}
+
+/// Structured vehicle-class label for [TripLabel]. Finer-grained than
+/// [Modality] — in particular it splits "bike" into unassisted/assist_25/
+/// assist_45/combustion — because that distinction was previously being
+/// smuggled into free-text `deviceLabel`/`note` fields inconsistently
+/// ("e-bik-hand", "e-bike achterzak" vs "e-bike broekzak").
+enum VehicleClass {
+  unassisted('unassisted', 'Onaangedreven'),
+  assist25('assist_25', 'E-fiets (25 km/u)'),
+  assist45('assist_45', 'Speed-pedelec (45 km/u)'),
+  combustion('combustion', 'Verbrandingsmotor'),
+  car('car', 'Auto'),
+  bus('bus', 'Bus'),
+  train('train', 'Trein'),
+  walk('walk', 'Lopen'),
+  other('other', 'Anders');
+
+  const VehicleClass(this.code, this.labelNl);
+
+  /// Stable machine code used in the export.
+  final String code;
+
+  /// Dutch UI label.
+  final String labelNl;
+
+  static VehicleClass fromCode(String code) => VehicleClass.values
+      .firstWhere((v) => v.code == code, orElse: () => VehicleClass.other);
+}
+
+/// Structured phone-placement label for [TripLabel]. A finer-grained sibling
+/// of [DevicePlacement], carried separately since [DevicePlacement] also
+/// drives the mid-trip [PlacementSwitch] flow.
+enum PhonePlacement {
+  handlebar('handlebar', 'Stuur'),
+  hand('hand', 'Hand'),
+  trouserPocket('trouser_pocket', 'Broekzak'),
+  jacketPocket('jacket_pocket', 'Jaszak'),
+  backpack('backpack', 'Rugzak'),
+  pannier('pannier', 'Fietstas'),
+  other('other', 'Anders');
+
+  const PhonePlacement(this.code, this.labelNl);
+
+  /// Stable machine code used in the export.
+  final String code;
+
+  /// Dutch UI label.
+  final String labelNl;
+
+  static PhonePlacement fromCode(String code) => PhonePlacement.values
+      .firstWhere((p) => p.code == code, orElse: () => PhonePlacement.other);
+}
+
+/// Structured trip label, collected up front on the pre-trip label screen.
+/// Every field is an enum code or a number — no free text — so trips are
+/// comparable across a batch of measurements. [note]/[deviceLabel] on [Trip]
+/// remain free text for anything else, but are no longer used as labels.
+class TripLabel {
+  const TripLabel({
+    required this.vehicleClass,
+    required this.phonePlacement,
+    required this.routeId,
+    required this.runIndex,
+  });
+
+  /// A [VehicleClass] code.
+  final String vehicleClass;
+
+  /// A [PhonePlacement] code.
+  final String phonePlacement;
+
+  /// Short free-typed route identifier (e.g. "ijklus-v1"), picked from a
+  /// combobox of previously used values or typed fresh.
+  final String routeId;
+
+  /// Repetition number within the same (vehicleClass, phonePlacement,
+  /// routeId) cell.
+  final int runIndex;
+
+  static const unset = TripLabel(
+    vehicleClass: 'other',
+    phonePlacement: 'other',
+    routeId: '',
+    runIndex: 1,
+  );
+
+  Map<String, dynamic> toJson() => {
+        'vehicleClass': vehicleClass,
+        'phonePlacement': phonePlacement,
+        'routeId': routeId,
+        'runIndex': runIndex,
+      };
+
+  factory TripLabel.fromJson(Map<String, dynamic> j) => TripLabel(
+        vehicleClass: j['vehicleClass'] as String? ?? 'other',
+        phonePlacement: j['phonePlacement'] as String? ?? 'other',
+        routeId: j['routeId'] as String? ?? '',
+        runIndex: (j['runIndex'] as num?)?.toInt() ?? 1,
+      );
 }
 
 /// A single GPS fix. Field names lat/lng/speed/date are intentionally identical
@@ -144,12 +250,17 @@ class MotionSample {
     required this.accRmsG,
     required this.accStdG,
     required this.accPeakG,
+    required this.accP95G,
     required this.accDomHz,
     required this.accZcr,
+    required this.accZcrHz,
     required this.gyroRmsRad,
     required this.gyroPeakRad,
     required this.steps,
     required this.sampleCount,
+    required this.windowSecs,
+    required this.fsHz,
+    required this.degraded,
     this.pressureHpa,
   });
 
@@ -157,12 +268,44 @@ class MotionSample {
   final double? accRmsG;
   final double? accStdG;
   final double? accPeakG;
+
+  /// 95th percentile of |acc magnitude - 1g| in the window — a robust
+  /// counterpart to [accPeakG], which is sensitive to window length.
+  final double? accP95G;
+
+  /// Dominant frequency (Hz), computed after resampling the window's
+  /// accelerometer signal to a fixed 50.0Hz grid — see [fsHz]/[windowSecs].
   final double? accDomHz;
+
+  /// Zero-crossing count on the same resampled 50.0Hz signal as [accDomHz],
+  /// crossing the (magnitude - 1g) zero line, i.e. 1g is subtracted (not the
+  /// window mean). Raw count — see [accZcrHz] for the rate.
   final int? accZcr;
+
+  /// [accZcr] / [windowSecs] — zero-crossing rate, comparable across windows
+  /// of slightly different length.
+  final double? accZcrHz;
+
   final double? gyroRmsRad;
   final double? gyroPeakRad;
   final int? steps;
   final int sampleCount;
+
+  /// (t_last - t_first) in seconds over the raw samples in this window.
+  final double? windowSecs;
+
+  /// (sampleCount - 1) / windowSecs — the effective accelerometer sampling
+  /// rate actually achieved this window. This is what varies between ~50Hz
+  /// and ~94Hz across (and sometimes within) trips; accDomHz/accZcr/accZcrHz
+  /// are normalized against a fixed 50.0Hz grid specifically so they stay
+  /// comparable regardless of this value.
+  final double? fsHz;
+
+  /// True if a gap wider than 100ms between consecutive accelerometer
+  /// samples was found in this window — resampling never interpolates across
+  /// it, so accDomHz/accZcr/accZcrHz may be based on a shorter, discontinuous
+  /// signal.
+  final bool degraded;
 
   /// Atmospheric pressure in hPa, if this device has a barometer. Optional —
   /// null on devices without one.
@@ -173,12 +316,17 @@ class MotionSample {
         'accRmsG': accRmsG,
         'accStdG': accStdG,
         'accPeakG': accPeakG,
+        'accP95G': accP95G,
         'accDomHz': accDomHz,
         'accZcr': accZcr,
+        'accZcrHz': accZcrHz,
         'gyroRmsRad': gyroRmsRad,
         'gyroPeakRad': gyroPeakRad,
         'steps': steps,
         'sampleCount': sampleCount,
+        'windowSecs': windowSecs,
+        'fsHz': fsHz,
+        'degraded': degraded,
         'pressureHpa': pressureHpa,
       };
 
@@ -187,12 +335,17 @@ class MotionSample {
         accRmsG: (j['accRmsG'] as num?)?.toDouble(),
         accStdG: (j['accStdG'] as num?)?.toDouble(),
         accPeakG: (j['accPeakG'] as num?)?.toDouble(),
+        accP95G: (j['accP95G'] as num?)?.toDouble(),
         accDomHz: (j['accDomHz'] as num?)?.toDouble(),
         accZcr: (j['accZcr'] as num?)?.toInt(),
+        accZcrHz: (j['accZcrHz'] as num?)?.toDouble(),
         gyroRmsRad: (j['gyroRmsRad'] as num?)?.toDouble(),
         gyroPeakRad: (j['gyroPeakRad'] as num?)?.toDouble(),
         steps: (j['steps'] as num?)?.toInt(),
         sampleCount: (j['sampleCount'] as num?)?.toInt() ?? 0,
+        windowSecs: (j['windowSecs'] as num?)?.toDouble(),
+        fsHz: (j['fsHz'] as num?)?.toDouble(),
+        degraded: j['degraded'] as bool? ?? false,
         pressureHpa: (j['pressureHpa'] as num?)?.toDouble(),
       );
 }
@@ -246,6 +399,8 @@ class Trip {
     List<PlacementSwitch>? placementSwitches,
     List<MotionSample>? motion,
     this.appVersion = kAppVersion,
+    this.schemaVersion = kSchemaVersion,
+    this.label = TripLabel.unset,
   })  : modalitySwitches = modalitySwitches ?? [],
         osActivity = osActivity ?? [],
         battery = battery ?? [],
@@ -255,12 +410,14 @@ class Trip {
 
   final String id;
   final String appVersion;
+  final int schemaVersion;
   final String deviceLabel;
   final String note;
   final DateTime start;
   DateTime? end;
   final String declaredModality; // modality code
   final String devicePlacement; // device placement code
+  final TripLabel label;
   final List<ModalitySwitch> modalitySwitches;
   final List<OsActivity> osActivity;
   final List<BatterySample> battery;
@@ -271,6 +428,7 @@ class Trip {
   Map<String, dynamic> toJson() => {
         'id': id,
         'appVersion': appVersion,
+        'schemaVersion': schemaVersion,
         'deviceLabel': deviceLabel,
         'note': note,
         'start': isoZ(start),
@@ -283,17 +441,22 @@ class Trip {
         'devicePlacement': devicePlacement,
         'placementSwitches': placementSwitches.map((e) => e.toJson()).toList(),
         'motion': motion.map((e) => e.toJson()).toList(),
+        'label': label.toJson(),
       };
 
   factory Trip.fromJson(Map<String, dynamic> j) => Trip(
         id: j['id'] as String,
         appVersion: (j['appVersion'] as String?) ?? kAppVersion,
+        schemaVersion: (j['schemaVersion'] as num?)?.toInt() ?? 1,
         deviceLabel: j['deviceLabel'] as String? ?? '',
         note: j['note'] as String? ?? '',
         start: DateTime.parse(j['start'] as String),
         end: j['end'] == null ? null : DateTime.parse(j['end'] as String),
         declaredModality: j['declaredModality'] as String? ?? 'walk',
         devicePlacement: j['devicePlacement'] as String? ?? 'pocket',
+        label: j['label'] == null
+            ? TripLabel.unset
+            : TripLabel.fromJson(j['label'] as Map<String, dynamic>),
         modalitySwitches: ((j['modalitySwitches'] as List?) ?? [])
             .map((e) => ModalitySwitch.fromJson(e as Map<String, dynamic>))
             .toList(),

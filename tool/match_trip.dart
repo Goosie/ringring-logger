@@ -6,7 +6,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ringring_logger/legacy/legacy_trip_format.dart';
+import 'parse_points.dart';
 import 'package:ringring_logger/quill/claims.dart';
 import 'package:ringring_logger/quill/matcher.dart';
 import 'package:ringring_logger/quill/registry.dart';
@@ -14,7 +14,7 @@ import 'package:ringring_logger/quill/registry.dart';
 void main(List<String> args) {
   final options = _parseArgs(args);
 
-  final points = parseLegacyDetails(File(options['trip']!).readAsStringSync());
+  final points = parsePointsExport(File(options['trip']!).readAsStringSync());
   final registry = Registry.parse(File(options['registry']!).readAsStringSync());
 
   final traversals = matchTrip(points, registry);
