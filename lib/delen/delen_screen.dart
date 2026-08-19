@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:nostr/nostr.dart';
@@ -13,6 +14,7 @@ import '../transport/nostr_transport.dart';
 import '../transport/transport.dart';
 import '../widgets/big_button.dart';
 import 'attest_provider.dart';
+import 'contributor_tag.dart';
 import 'envelope.dart';
 import 'envelope_codec.dart';
 import 'geo_utils.dart';
@@ -44,6 +46,14 @@ class _DelenScreenState extends State<DelenScreen> {
   bool _matching = false;
   bool _postingAll = false;
 
+  // Loaded once per screen so every envelope's contributor tag is derived
+  // from the same per-installation secret. Null means either "not loaded
+  // yet" or "failed to load" — _vaultSecretError distinguishes the two,
+  // and _postOne refuses to post while it's null rather than falling back
+  // to an empty/zero secret.
+  Uint8List? _vaultSecret;
+  String? _vaultSecretError;
+
   Future<void> _makeEnvelopes() async {
     setState(() => _matching = true);
     // Trim before matching, not after: claims near the start/end of a trip
@@ -56,16 +66,34 @@ class _DelenScreenState extends State<DelenScreen> {
     final traversals = matchTrip(points, registry);
     final claims = deriveClaims(traversals, registry);
 
+    Uint8List? vaultSecret;
+    String? vaultSecretError;
+    try {
+      vaultSecret = await loadOrCreateVaultSecret();
+    } catch (err) {
+      vaultSecretError = 'Kan de bijdrager-sleutel niet laden: $err';
+    }
+
     if (!mounted) return;
     setState(() {
       _registry = registry;
       _envelopes = claims.map(Envelope.new).toList();
+      _vaultSecret = vaultSecret;
+      _vaultSecretError = vaultSecretError;
       _matching = false;
     });
   }
 
   Future<void> _postOne(Envelope e) async {
     if (e.status == EnvelopeStatus.posting || e.status == EnvelopeStatus.posted) {
+      return;
+    }
+    final vaultSecret = _vaultSecret;
+    if (vaultSecret == null) {
+      setState(() {
+        e.status = EnvelopeStatus.failed;
+        e.error = _vaultSecretError ?? 'Bijdrager-sleutel niet beschikbaar.';
+      });
       return;
     }
     setState(() {
@@ -76,7 +104,8 @@ class _DelenScreenState extends State<DelenScreen> {
       // Vers keypair per envelop; de private key leeft alleen in deze
       // lokale variabele en wordt na signeren nergens bewaard of gelogd.
       final keys = Keys.generate();
-      final event = await buildEnvelopeEvent(e, keys, _attest);
+      final tag = contributorTag(vaultSecret, e.claim.corridorId, e.claim.date);
+      final event = await buildEnvelopeEvent(e, keys, _attest, contributorTag: tag);
       final id = await _transport.submitEnvelope(event);
       if (!mounted) return;
       setState(() {

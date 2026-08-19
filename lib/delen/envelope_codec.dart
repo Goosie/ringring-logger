@@ -13,16 +13,24 @@ import 'envelope.dart';
 /// [GiftWrap.wrap]) and a randomized `created_at`, so even the outer
 /// envelope's signer and timing change every time.
 ///
-/// Only the corridor/hour/modality claim and its derived numbers ever
-/// reach the rumor — never raw coordinates or the raw samples array. The
-/// rumor is NIP-44-encrypted twice (seal, then wrap) before it ever
+/// Only the corridor/hour/modality claim and its derived numbers, plus
+/// [contributorTag], ever reach the rumor — never raw coordinates or the
+/// raw samples array. The contributor tag lets the Mailroom count unique
+/// contributors instead of enveloppen, without leaking identity: it is
+/// derived from a per-device secret that never leaves the caller's device,
+/// so it only links claims within the same corridor and day, never across
+/// corridors or days. This function stays pure — it never reads the
+/// secret itself, only the tag already derived from it.
+///
+/// The rumor is NIP-44-encrypted twice (seal, then wrap) before it ever
 /// touches a relay; only whoever holds [RingRingConfig.recipientPubkey]'s
 /// secret key can read it.
 Future<Event> buildEnvelopeEvent(
   Envelope envelope,
   Keys keys,
-  AttestProvider attest,
-) async {
+  AttestProvider attest, {
+  required String contributorTag,
+}) async {
   final claim = envelope.claim;
   final (attestType, attestPayload) = attest.createAttest();
 
@@ -32,6 +40,7 @@ Future<Event> buildEnvelopeEvent(
     ['t', claim.date],
     ['hour', claim.hourBucket.toString().padLeft(2, '0')],
     ['modality', claim.modality],
+    ['contributor', contributorTag],
     ['attest', attestType, attestPayload],
   ];
 

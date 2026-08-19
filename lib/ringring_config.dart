@@ -28,7 +28,7 @@ class RingRingConfig {
   static const int eventKind = 4451;
 
   /// Envelope schema version, carried in the `v` tag.
-  static const String envelopVersie = '1';
+  static const String envelopVersie = '2';
 
   /// The gift wrap's recipient (NIP-59 `p` tag) — the "Ring-Ring address".
   /// This is a fresh, throwaway TEST keypair generated for this phase, not
